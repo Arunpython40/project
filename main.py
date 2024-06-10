@@ -1,66 +1,46 @@
+import cv2
+from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivymd.app import MDApp
-from kivy.lang import Builder
-from kivy.core.window import Window
-from kivy.uix.screenmanager import Screen, ScreenManager
+from kivy.uix.button import Button
+from kivy.graphics.texture import Texture
+from kivy.uix.image import Image
+from kivy.clock import Clock
+from datetime import datetime
 
-
-class testApp(Screen):
-    def __int__(self, **kwargs):
-        super().__int__(**kwargs)
-
-
-class HomeScreen(Screen):
-    def __init__(self, **kwargs):
-        super(HomeScreen, self).__init__(**kwargs)
-
-        layout = BoxLayout(orientation='vertical', spacing=10, padding=20)
-        welcome_label = Label(text='Welcome to the Home Screen!')
-
-        layout.add_widget(welcome_label)
-        self.add_widget(layout)
-
-
-class MyApp(MDApp):
-
+class CameraApp(App):
     def build(self):
-        self.theme_cls.theme_style = 'Dark'
+        self.capture = cv2.VideoCapture(0)
+        self.my_camera = Image()
+        layout = BoxLayout(orientation='vertical')
 
-        self.screen_manager = ScreenManager()
-        self.login_screen = testApp(name='login')
-        self.home_screen = HomeScreen(name='home')
-        self.screen_manager.add_widget(self.login_screen)
-        self.screen_manager.add_widget(self.home_screen)
+        layout.add_widget(self.my_camera)
 
-        return self.screen_manager
+        btn = Button(text="Take Picture")
+        btn.bind(on_press=self.take_picture)
+        layout.add_widget(btn)
 
+        Clock.schedule_interval(self.update, 1.0 / 30.0)
+        return layout
 
+    def update(self, dt):
+        ret, frame = self.capture.read()
+        if ret:
+            buf1 = cv2.flip(frame, 0)
+            buf = buf1.tostring()
+            image_texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
+            image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+            self.my_camera.texture = image_texture
 
+    def take_picture(self, *args):
+        ret, frame = self.capture.read()
+        if ret:
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"IMG_{current_time}.png"
+            cv2.imwrite(filename, frame)
+            print(f"Picture saved as {filename}")
 
-    def verify_data(self, email, pwd):
-        from firebase import firebase
+    def on_stop(self):
+        self.capture.release()
 
-        firebase = firebase.FirebaseApplication('https://asymmetric-ray-385413-default-rtdb.firebaseio.com/', None)
-
-        # data = {
-        # 'Email': Email,
-        # 'Password': pwd
-        # }
-
-        # post data
-
-        # firebase.post('asymmetric-ray-385413-default-rtdb/Users',data)
-
-        result = firebase.get('asymmetric-ray-385413-default-rtdb/Users', '')
-
-        for i in result.keys():
-            if result[i]['Email'] == email:
-                if result[i]['Password'] == pwd:
-                    self.screen_manager.current = 'home'
-
-
-if __name__ == "__main__":
-    Window.size = (350, 700)
-    Builder.load_file("main.kv")
-    MyApp().run()
+if __name__ == '__main__':
+    CameraApp().run()
